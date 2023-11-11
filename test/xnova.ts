@@ -8,7 +8,7 @@ describe("XNOVA", function () {
   let xnova: XNOVA;
   before(async () => {
     const [owner] = await ethers.getSigners();
-    const xnovaFactory = await ethers.getContractFactory("YourContract");
+    const xnovaFactory = await ethers.getContractFactory("XNOVA");
     xnova = (await xnovaFactory.deploy(owner.address)) as XNOVA;
     await xnova.deployed();
   });
