@@ -46,7 +46,7 @@ contract XNOVA is ERC20, Ownable {
 	uint256 public maxBuyTransactionAmount = 200000 * 1e18; // 2% of total supply 10M
 	uint256 public swapTokensAtAmount = 25000 * 1e18;
 
-	uint256 private feeUnits = 1000; // 1000 represents 100%
+	uint256 private constant feeUnits = 1000; // 1000 represents 100%
 	uint256 public standardFee = 300; // 4% buy fees , 30% at launch
 	uint256 public revenueFee = 150; // 2% to revenuewallet, 15% at launch
 	uint256 public treasuryFee = 150; // 2% to treasurywallet, 15% at launch
@@ -141,6 +141,11 @@ contract XNOVA is ERC20, Ownable {
 		uint256 _revenueFee,
 		uint256 _treasuryFee
 	) external onlyOwner {
+		require(_revenueFee > 0, "XNOVA: Revenue fee should be greater than 0");
+		require(
+			_treasuryFee > 0,
+			"XNOVA: Treasury fee should be greater than 0"
+		);
 		revenueFee = _revenueFee;
 		treasuryFee = _treasuryFee;
 		standardFee = _treasuryFee + _revenueFee;
@@ -197,17 +202,19 @@ contract XNOVA is ERC20, Ownable {
 			address(Token) != address(this),
 			"XNOVA: You cannot remove this Token"
 		);
-		Token.transfer(owner(), Token.balanceOf(address(this)));
+		bool success = Token.transfer(owner(), Token.balanceOf(address(this)));
+		require(success, "XNOVA: TOKEN TRANSFER FAILED");
 	}
 
 	/**
 	 * Function that allows only the owner to remove XNOVA tokens, ETH from the contract
 	 */
 	function _removeDust() private {
-		IERC20(address(this)).transfer(
+		bool successErc20 = IERC20(address(this)).transfer(
 			owner(),
 			IERC20(address(this)).balanceOf(address(this))
 		);
+		require(successErc20, "XNOVA: TOKEN TRANSFER FAILED");
 		(bool success, ) = payable(owner()).call{
 			value: address(this).balance
 		}("");
@@ -253,7 +260,7 @@ contract XNOVA is ERC20, Ownable {
 		bool noFee = _isExcludedFromFee[from] ||
 			_isExcludedFromFee[to] ||
 			disableFees ||
-			to == address(uniswapV2Router); // No fees when removing liquidity
+			to == address(uniswapV2Router);
 
 		// Blacklisted can't transfer
 		require(
@@ -289,7 +296,7 @@ contract XNOVA is ERC20, Ownable {
 				}
 			}
 
-			// Get buy fee amounts
+			// Get buy and sell fee amounts
 			uint256 fees = (amount * (standardFee)) / (feeUnits);
 
 			if (automatedMarketMakerPairs[from]) {
@@ -302,7 +309,7 @@ contract XNOVA is ERC20, Ownable {
 						(lastTransactionTime[to] == 0) ||
 							(block.timestamp - lastTransactionTime[to] >=
 								trasferDelay),
-						"XNOVA: Only one transaction allowed within 10 minutes"
+						"XNOVA: Next swap must be performed after the transfer delay"
 					);
 					lastTransactionTime[to] = block.timestamp;
 				}
@@ -318,7 +325,7 @@ contract XNOVA is ERC20, Ownable {
 						lastTransactionTime[from] == 0 ||
 							block.timestamp - lastTransactionTime[from] >=
 							trasferDelay,
-						"XNOVA: Only one transaction allowed within the transfer Delay"
+						"XNOVA: Next swap must be performed after the transfer delay"
 					);
 					lastTransactionTime[from] = block.timestamp;
 				}
